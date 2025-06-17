@@ -496,6 +496,7 @@
 
 from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.params import Form
 from fastapi.staticfiles import StaticFiles
 from pytesseract import image_to_string
 from PIL import Image
@@ -506,6 +507,7 @@ from reportlab.lib.pagesizes import A4
 
 # Initialize FastAPI
 app = FastAPI()
+current_userid = ""
 
 # Enable CORS
 app.add_middleware(
@@ -515,8 +517,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # Serve PDF directory
-app.mount("/pdf_files", StaticFiles(directory="pdf_files"), name="pdfs")
+app.mount("/pdf_files", StaticFiles(directory="../edu_pilot/public/pdf_files"), name="pdfs")
+
+# Used to create Folder on each submission
+def create_submission_folder(submission_id: str):
+    folder_path = os.path.join("../edu_pilot/public/pdf_files", submission_id)
+    os.makedirs(folder_path, exist_ok=True)
+    return folder_path
 
 # 🔁 Use local Mistral model via Ollama
 def query_mistral(prompt: str):
@@ -536,7 +545,7 @@ def clean_and_split_text(text):
 
 # Generate explanation for one topic
 def generate_explanation(topic):
-    prompt = f"Explain this topic in simple terms for beginners: {topic}"
+    prompt = f"Explain this topic in detail: {topic}"
     return query_mistral(prompt)
 
 # General prompt generator
@@ -566,13 +575,28 @@ def save_section_to_pdf(filename, title, content):
 
 # OCR + AI + PDF generation endpoint
 @app.post("/extract-text")
-async def extract_text(file: UploadFile = File(...)):
+async def extract_text(file: UploadFile = File(...),userid: str = Form(...),submissionId: str = Form(...)):
+    # Image File Reading from the request
     contents = await file.read()
+    # Assigning user id after extraction 
+    current_userid = userid
+    # print(current_userid,"Submission_Id",submissionId)
+    
+     # Step 1: Create folder named by submission_id
+    folder_path = create_submission_folder(submissionId)
+
+    # Step 2: Save image file
+    image_path = os.path.join(folder_path, file.filename)
+    # with open(image_path, "wb") as f: 
+    #     f.write(await file.read())
+    with open(image_path, "wb") as buffer:
+        buffer.write(await file.read())
+    print("Folder has been created and the image has been saved!")
+        
     image = Image.open(io.BytesIO(contents))
     extracted_text = image_to_string(image)
-
     topics = clean_and_split_text(extracted_text)
-
+    
     # 1. Topic Explanations
     explained_topics = []
     for topic in topics:
@@ -602,7 +626,7 @@ async def extract_text(file: UploadFile = File(...)):
     timeline = generate_prompt_with_model(timeline_prompt)
 
     # Create output directory
-    output_dir = "pdf_files"
+    output_dir = folder_path+"/"+submissionId
     os.makedirs(output_dir, exist_ok=True)
     timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
 
@@ -626,7 +650,228 @@ async def extract_text(file: UploadFile = File(...)):
     save_section_to_pdf(timeline_file, "Course Timeline", timeline)
 
     # Return text for testing or debugging
+    print(explained_topics,timeline,presentations,papers)
     return {
         "response": explanations_text
         # You can also return PDF URLs here if frontend needs them
     }
+
+
+# from fastapi import FastAPI, File, UploadFile
+# from fastapi.middleware.cors import CORSMiddleware
+# from fastapi.staticfiles import StaticFiles
+# from pytesseract import image_to_string
+# from PIL import Image
+# from datetime import datetime
+# import io, os, re, requests
+
+# # Import necessary ReportLab modules for proper text flow
+# from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+# from reportlab.lib.styles import getSampleStyleSheet
+# from reportlab.lib.pagesizes import A4
+# from reportlab.lib.units import inch
+
+# # Initialize FastAPI
+# app = FastAPI()
+
+# # Enable CORS
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["*"],
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
+
+# # Serve PDF directory
+# # Ensure the 'pdf_files' directory exists before mounting
+# os.makedirs("pdf_files", exist_ok=True)
+# app.mount("/pdf_files", StaticFiles(directory="pdf_files"), name="pdfs")
+
+# # 🔁 Use local Mistral model via Ollama
+# def query_mistral(prompt: str):
+#     """
+#     Queries the local Mistral model via Ollama for text generation.
+
+#     Args:
+#         prompt (str): The text prompt to send to the model.
+
+#     Returns:
+#         str: The generated response from the model, or an error message.
+#     """
+#     response = requests.post(
+#         "http://localhost:11434/api/generate",
+#         json={"model": "mistral", "prompt": prompt, "stream": False},
+#     )
+#     if response.status_code == 200:
+#         return response.json().get("response", "").strip()
+#     else:
+#         return f"Error: {response.status_code} - {response.text}"
+
+# # Clean and split text into topics
+# def clean_and_split_text(text: str) -> list[str]:
+#     """
+#     Cleans and splits a given text into a list of topics.
+#     Topics are separated by newlines, commas, semicolons, or hyphens.
+
+#     Args:
+#         text (str): The input text to clean and split.
+
+#     Returns:
+#         list[str]: A list of cleaned topic strings.
+#     """
+#     topics = re.split(r'[\n,;•-]+', text)
+#     return [t.strip() for t in topics if t.strip()]
+
+# # Generate explanation for one topic
+# def generate_explanation(topic: str) -> str:
+#     """
+#     Generates a simple explanation for a given topic using the Mistral model.
+
+#     Args:
+#         topic (str): The topic to explain.
+
+#     Returns:
+#         str: The explanation generated by the model.
+#     """
+#     prompt = f"Explain this topic in simple terms for beginners: {topic}"
+#     return query_mistral(prompt)
+
+# # General prompt generator
+# def generate_prompt_with_model(prompt: str) -> str:
+#     """
+#     Generates a response for a general prompt using the Mistral model.
+
+#     Args:
+#         prompt (str): The prompt to send to the model.
+
+#     Returns:
+#         str: The response generated by the model.
+#     """
+#     return query_mistral(prompt)
+
+# # Save a section to a separate PDF using ReportLab Flowables
+# def save_section_to_pdf(filename: str, title: str, content: str):
+#     """
+#     Saves content to a PDF file, handling text wrapping and pagination automatically.
+#     Uses ReportLab's SimpleDocTemplate and Paragraph for robust PDF generation.
+
+#     Args:
+#         filename (str): The full path and filename for the output PDF.
+#         title (str): The title of the section to be included in the PDF.
+#         content (str): The main text content for the PDF.
+#     """
+#     doc = SimpleDocTemplate(filename, pagesize=A4,
+#                             rightMargin=inch, leftMargin=inch,
+#                             topMargin=inch, bottomMargin=inch)
+#     styles = getSampleStyleSheet()
+#     Story = []
+
+#     # Add title
+#     # Using 'h1' style for the main title
+#     Story.append(Paragraph(title, styles['h1']))
+#     Story.append(Spacer(1, 0.2 * inch)) # Add some space after the title
+#     Story.append(Paragraph("-" * 90, styles['Normal'])) # Separator line
+#     Story.append(Spacer(1, 0.2 * inch)) # Add some space after the separator
+
+#     # Add content
+#     # Split content by newlines and add each paragraph separately
+#     # This ensures proper line breaks and paragraph spacing
+#     for para_text in content.split('\n'):
+#         if para_text.strip(): # Only add non-empty lines as paragraphs
+#             # Using 'Normal' style for body text
+#             Story.append(Paragraph(para_text, styles['Normal']))
+#             Story.append(Spacer(1, 0.1 * inch)) # Space between paragraphs
+
+#     # Build the PDF document
+#     try:
+#         doc.build(Story)
+#     except Exception as e:
+#         print(f"Error building PDF {filename}: {e}")
+
+# # OCR + AI + PDF generation endpoint
+# @app.post("/extract-text")
+# async def extract_text(file: UploadFile = File(...)):
+#     """
+#     Endpoint to extract text from an image, generate AI-driven content
+#     (explanations, assignments, presentations, quizzes, papers, timeline),
+#     and save them as separate PDF files.
+
+#     Args:
+#         file (UploadFile): The uploaded image file.
+
+#     Returns:
+#         dict: A dictionary containing the extracted text and a message
+#               indicating PDF generation.
+#     """
+#     contents = await file.read()
+#     image = Image.open(io.BytesIO(contents))
+#     extracted_text = image_to_string(image)
+
+#     topics = clean_and_split_text(extracted_text)
+
+#     # 1. Topic Explanations
+#     explained_topics = []
+#     for topic in topics:
+#         explanation = generate_explanation(topic)
+#         explained_topics.append((topic, explanation))
+
+#     # Format explanations for PDF: Each topic and its explanation
+#     explanations_text = "\n\n".join([f"{title}\n\n{content}" for title, content in explained_topics])
+
+#     # 2. Assignments
+#     assignments_prompt = f"Generate assignment topics from this course content: {', '.join(topics)}"
+#     assignments = generate_prompt_with_model(assignments_prompt)
+
+#     # 3. Presentations
+#     presentations_prompt = f"Suggest presentation topics for these contents: {', '.join(topics)}"
+#     presentations = generate_prompt_with_model(presentations_prompt)
+
+#     # 4. Quizzes
+#     quiz_prompt = f"Create 1 quiz from this content \"{extracted_text}\" with easy level. Include MCQs, True/False, and Short Questions."
+#     quiz = generate_prompt_with_model(quiz_prompt)
+
+#     # 5. Mid & Final Term Papers
+#     paper_prompt = f"Create Mid-Term and Final-Term papers with easy level from this content \"{extracted_text}\"."
+#     papers = generate_prompt_with_model(paper_prompt)
+
+#     # 6. Course Timeline
+#     timeline_prompt = f"Create a timeline to cover the following topics in a 3-month course: {', '.join(topics)}"
+#     timeline = generate_prompt_with_model(timeline_prompt)
+
+#     # Create output directory if it doesn't exist
+#     output_dir = "pdf_files"
+#     os.makedirs(output_dir, exist_ok=True)
+#     timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+
+#     # Save PDFs
+#     explanation_file = os.path.join(output_dir, f"explanations_{timestamp}.pdf")
+#     save_section_to_pdf(explanation_file, "Topic Explanations", explanations_text)
+
+#     assignments_file = os.path.join(output_dir, f"assignments_{timestamp}.pdf")
+#     save_section_to_pdf(assignments_file, "Assignment Topics", assignments)
+
+#     presentations_file = os.path.join(output_dir, f"presentations_{timestamp}.pdf")
+#     save_section_to_pdf(presentations_file, "Presentation Topics", presentations)
+
+#     quiz_file = os.path.join(output_dir, f"quizzes_{timestamp}.pdf")
+#     save_section_to_pdf(quiz_file, "Quiz", quiz)
+
+#     papers_file = os.path.join(output_dir, f"papers_{timestamp}.pdf")
+#     save_section_to_pdf(papers_file, "Mid & Final Term Papers", papers)
+
+#     timeline_file = os.path.join(output_dir, f"timeline_{timestamp}.pdf")
+#     save_section_to_pdf(timeline_file, "Course Timeline", timeline)
+
+#     # Return a confirmation message and the extracted text
+#     return {
+#         "message": "PDFs generated successfully in the 'pdf_files' directory.",
+#         "extracted_text": extracted_text,
+#         "pdf_files_generated": {
+#             "explanations": f"/pdf_files/explanations_{timestamp}.pdf",
+#             "assignments": f"/pdf_files/assignments_{timestamp}.pdf",
+#             "presentations": f"/pdf_files/presentations_{timestamp}.pdf",
+#             "quizzes": f"/pdf_files/quizzes_{timestamp}.pdf",
+#             "papers": f"/pdf_files/papers_{timestamp}.pdf",
+#             "timeline": f"/pdf_files/timeline_{timestamp}.pdf",
+#         }
+#     }
