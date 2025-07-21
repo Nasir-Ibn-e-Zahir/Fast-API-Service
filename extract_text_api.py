@@ -166,117 +166,117 @@
 
 #####################################################################################################
 
-from fastapi import FastAPI, File, UploadFile, Form
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from pytesseract import image_to_string
-from PIL import Image
-from datetime import datetime
-import io, os, re, requests, textwrap
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
+# from fastapi import FastAPI, File, UploadFile, Form
+# from fastapi.middleware.cors import CORSMiddleware
+# from fastapi.staticfiles import StaticFiles
+# from pytesseract import image_to_string
+# from PIL import Image
+# from datetime import datetime
+# import io, os, re, requests, textwrap
+# from reportlab.pdfgen import canvas
+# from reportlab.lib.pagesizes import A4
 
-app = FastAPI()
-current_userid = ""
+# app = FastAPI()
+# current_userid = ""
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["*"],
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
 
-app.mount("/pdf_files", StaticFiles(directory="../edu_pilot/public/pdf_files"), name="pdfs")
+# app.mount("/pdf_files", StaticFiles(directory="../edu_pilot/public/pdf_files"), name="pdfs")
 
-def create_submission_folder(submission_id: str):
-    folder_path = os.path.join("../edu_pilot/public/pdf_files", submission_id)
-    os.makedirs(folder_path, exist_ok=True)
-    return folder_path
+# def create_submission_folder(submission_id: str):
+#     folder_path = os.path.join("../edu_pilot/public/pdf_files", submission_id)
+#     os.makedirs(folder_path, exist_ok=True)
+#     return folder_path
 
-def query_mistral(prompt: str):
-    response = requests.post(
-        "http://localhost:11434/api/generate",
-        json={"model": "mistral", "prompt": prompt, "stream": False},
-    )
-    if response.status_code == 200:
-        return response.json().get("response", "").strip()
-    return f"Error: {response.status_code} - {response.text}"
+# def query_mistral(prompt: str):
+#     response = requests.post(
+#         "http://localhost:11434/api/generate",
+#         json={"model": "mistral", "prompt": prompt, "stream": False},
+#     )
+#     if response.status_code == 200:
+#         return response.json().get("response", "").strip()
+#     return f"Error: {response.status_code} - {response.text}"
 
-def clean_and_split_text(text):
-    topics = re.split(r'[\n,;•-]+', text)
-    return [t.strip() for t in topics if t.strip()]
+# def clean_and_split_text(text):
+#     topics = re.split(r'[\n,;•-]+', text)
+#     return [t.strip() for t in topics if t.strip()]
 
-def generate_explanation(topic):
-    prompt = f"Explain this topic in detail: {topic}"
-    return query_mistral(prompt)
+# def generate_explanation(topic):
+#     prompt = f"Explain this topic in detail: {topic}"
+#     return query_mistral(prompt)
 
-def generate_prompt_with_model(prompt):
-    return query_mistral(prompt)
+# def generate_prompt_with_model(prompt):
+#     return query_mistral(prompt)
 
-# ⬇️ PDF Writer with line wrapping
-def save_section_to_pdf(filename, title, content, max_width=90):
-    c = canvas.Canvas(filename, pagesize=A4)
-    width, height = A4
-    textobject = c.beginText(40, height - 40)
-    textobject.setFont("Helvetica-Bold", 14)
-    textobject.textLine(title)
-    textobject.textLine("-" * 90)
-    textobject.setFont("Helvetica", 12)
+# # ⬇️ PDF Writer with line wrapping
+# def save_section_to_pdf(filename, title, content, max_width=90):
+#     c = canvas.Canvas(filename, pagesize=A4)
+#     width, height = A4
+#     textobject = c.beginText(40, height - 40)
+#     textobject.setFont("Helvetica-Bold", 14)
+#     textobject.textLine(title)
+#     textobject.textLine("-" * 90)
+#     textobject.setFont("Helvetica", 12)
 
-    for line in content.split('\n'):
-        wrapped_lines = textwrap.wrap(line, width=max_width)
-        for wline in wrapped_lines:
-            if textobject.getY() <= 50:
-                c.drawText(textobject)
-                c.showPage()
-                textobject = c.beginText(40, height - 40)
-                textobject.setFont("Helvetica", 12)
-            textobject.textLine(wline)
+#     for line in content.split('\n'):
+#         wrapped_lines = textwrap.wrap(line, width=max_width)
+#         for wline in wrapped_lines:
+#             if textobject.getY() <= 50:
+#                 c.drawText(textobject)
+#                 c.showPage()
+#                 textobject = c.beginText(40, height - 40)
+#                 textobject.setFont("Helvetica", 12)
+#             textobject.textLine(wline)
 
-    c.drawText(textobject)
-    c.save()
+#     c.drawText(textobject)
+#     c.save()
 
-@app.post("/extract-text")
-async def extract_text(file: UploadFile = File(...), userid: str = Form(...), submissionId: str = Form(...)):
-    contents = await file.read()
-    current_userid = userid
-    folder_path = create_submission_folder(submissionId)
-    image_path = os.path.join(folder_path, file.filename)
+# @app.post("/extract-text")
+# async def extract_text(file: UploadFile = File(...), userid: str = Form(...), submissionId: str = Form(...)):
+#     contents = await file.read()
+#     current_userid = userid
+#     folder_path = create_submission_folder(submissionId)
+#     image_path = os.path.join(folder_path, file.filename)
 
-    with open(image_path, "wb") as buffer:
-        buffer.write(contents)
-    print("Folder created and image saved.")
+#     with open(image_path, "wb") as buffer:
+#         buffer.write(contents)
+#     print("Folder created and image saved.")
 
-    image = Image.open(io.BytesIO(contents))
-    extracted_text = image_to_string(image)
-    topics = clean_and_split_text(extracted_text)
+#     image = Image.open(io.BytesIO(contents))
+#     extracted_text = image_to_string(image)
+#     topics = clean_and_split_text(extracted_text)
 
-    explained_topics = []
-    for topic in topics:
-        explanation = generate_explanation(topic)
-        explained_topics.append((topic, explanation))
-    explanations_text = "\n\n".join([f"{title}\n{'-'*50}\n{content}" for title, content in explained_topics])
+#     explained_topics = []
+#     for topic in topics:
+#         explanation = generate_explanation(topic)
+#         explained_topics.append((topic, explanation))
+#     explanations_text = "\n\n".join([f"{title}\n{'-'*50}\n{content}" for title, content in explained_topics])
 
-    assignments = generate_prompt_with_model(f"Generate assignment topics from this course content: {', '.join(topics)}")
-    presentations = generate_prompt_with_model(f"Suggest presentation topics for these contents: {', '.join(topics)}")
-    quiz = generate_prompt_with_model(f"Create 1 quiz from this content \"{extracted_text}\" with easy level. Include MCQs, True/False, and Short Questions.")
-    papers = generate_prompt_with_model(f"Create Mid-Term and Final-Term papers with easy level from this content \"{extracted_text}\".")
-    timeline = generate_prompt_with_model(f"Create a timeline to cover the following topics in a 3-month course: {', '.join(topics)}")
+#     assignments = generate_prompt_with_model(f"Generate assignment topics from this course content: {', '.join(topics)}")
+#     presentations = generate_prompt_with_model(f"Suggest presentation topics for these contents: {', '.join(topics)}")
+#     quiz = generate_prompt_with_model(f"Create 1 quiz from this content \"{extracted_text}\" with easy level. Include MCQs, True/False, and Short Questions.")
+#     papers = generate_prompt_with_model(f"Create Mid-Term and Final-Term papers with easy level from this content \"{extracted_text}\".")
+#     timeline = generate_prompt_with_model(f"Create a timeline to cover the following topics in a 3-month course: {', '.join(topics)}")
 
-    output_dir = folder_path + "/" + submissionId
-    os.makedirs(output_dir, exist_ok=True)
-    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+#     output_dir = folder_path + "/" + submissionId
+#     os.makedirs(output_dir, exist_ok=True)
+#     timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
 
-    save_section_to_pdf(os.path.join(output_dir, f"explanations_{timestamp}.pdf"), "Topic Explanations", explanations_text)
-    save_section_to_pdf(os.path.join(output_dir, f"assignments_{timestamp}.pdf"), "Assignment Topics", assignments)
-    save_section_to_pdf(os.path.join(output_dir, f"presentations_{timestamp}.pdf"), "Presentation Topics", presentations)
-    save_section_to_pdf(os.path.join(output_dir, f"quizzes_{timestamp}.pdf"), "Quiz", quiz)
-    save_section_to_pdf(os.path.join(output_dir, f"papers_{timestamp}.pdf"), "Mid & Final Term Papers", papers)
-    save_section_to_pdf(os.path.join(output_dir, f"timeline_{timestamp}.pdf"), "Course Timeline", timeline)
+#     save_section_to_pdf(os.path.join(output_dir, f"explanations_{timestamp}.pdf"), "Topic Explanations", explanations_text)
+#     save_section_to_pdf(os.path.join(output_dir, f"assignments_{timestamp}.pdf"), "Assignment Topics", assignments)
+#     save_section_to_pdf(os.path.join(output_dir, f"presentations_{timestamp}.pdf"), "Presentation Topics", presentations)
+#     save_section_to_pdf(os.path.join(output_dir, f"quizzes_{timestamp}.pdf"), "Quiz", quiz)
+#     save_section_to_pdf(os.path.join(output_dir, f"papers_{timestamp}.pdf"), "Mid & Final Term Papers", papers)
+#     save_section_to_pdf(os.path.join(output_dir, f"timeline_{timestamp}.pdf"), "Course Timeline", timeline)
 
-    return {
-        "response": explanations_text
-    }
+#     return {
+#         "response": explanations_text
+#     }
 
 
 
@@ -378,3 +378,179 @@ async def extract_text(file: UploadFile = File(...), userid: str = Form(...), su
 #     return {
 #         "response": explanations_text
 #     }
+
+
+
+
+# ******************************************************************************************
+
+from fastapi import FastAPI, File, UploadFile, Form
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pytesseract import image_to_string
+from PIL import Image
+from datetime import datetime
+import io, os, re, requests, textwrap
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from typing import List
+
+app = FastAPI()
+current_userid = ""
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.mount("/pdf_files", StaticFiles(directory="../edu_pilot/public/pdf_files"), name="pdfs")
+
+def create_submission_folder(submission_id: str):
+    folder_path = os.path.join("../edu_pilot/public/pdf_files", submission_id)
+    os.makedirs(folder_path, exist_ok=True)
+    return folder_path
+
+def query_mistral(prompt: str):
+    response = requests.post(
+        "http://localhost:11434/api/generate",
+        json={"model": "mistral", "prompt": prompt, "stream": False},
+    )
+    if response.status_code == 200:
+        return response.json().get("response", "").strip()
+    return f"Error: {response.status_code} - {response.text}"
+
+def clean_and_split_text(text):
+    topics = re.split(r'[\n,;•-]+', text)
+    return [t.strip() for t in topics if t.strip()]
+
+def generate_explanation(topic):
+    prompt = f"Explain this topic in detail: {topic}"
+    return query_mistral(prompt)
+
+def generate_prompt_with_model(prompt):
+    return query_mistral(prompt)
+
+# Modular generators
+def generate_assignments(topics):
+    return generate_prompt_with_model(f"Generate assignment topics from this course content: {', '.join(topics)}")
+
+def generate_presentations(topics):
+    return generate_prompt_with_model(f"Suggest presentation topics for these contents: {', '.join(topics)}")
+
+def generate_quiz(text):
+    return generate_prompt_with_model(f"Create 1 quiz from this content \"{text}\" with easy level. Include MCQs, True/False, and Short Questions.")
+
+def summarize_text(text: str):
+        prompt = f"Summarize the following content in a short phrase (max 10 words): {text[:1000]}"
+        return generate_prompt_with_model(prompt)
+
+def generate_mid_papers(text):
+    return generate_prompt_with_model(f"Create Final-Term papers 6 mcqs with options, 4 short and 3 long questions with easy level from this content \"{text}\".")
+
+def generate_final_papers(text):
+    return generate_prompt_with_model(f"Create Final-Term papers 14 mcqs with options, 12 True/False, 4 short and 3 long questions with easy level from this content \"{text}\".")
+
+def generate_timeline(topics):
+    return generate_prompt_with_model(f"Create a timeline to cover the following topics in a 3-month course: {', '.join(topics)}")
+
+# ⬇️ PDF Writer with line wrapping
+def save_section_to_pdf(filename, title, content, max_width=90):
+    c = canvas.Canvas(filename, pagesize=A4)
+    width, height = A4
+    textobject = c.beginText(40, height - 40)
+    textobject.setFont("Helvetica-Bold", 14)
+    textobject.textLine(title)
+    textobject.textLine("-" * 90)
+    textobject.setFont("Helvetica", 12)
+
+    for line in content.split('\n'):
+        wrapped_lines = textwrap.wrap(line, width=max_width)
+        for wline in wrapped_lines:
+            if textobject.getY() <= 50:
+                c.drawText(textobject)
+                c.showPage()
+                textobject = c.beginText(40, height - 40)
+                textobject.setFont("Helvetica", 12)
+            textobject.textLine(wline)
+
+    c.drawText(textobject)
+    c.save()
+
+@app.post("/extract-text")
+async def extract_text(
+    file: UploadFile = File(...),
+    userid: str = Form(...),
+    submissionId: str = Form(...),
+    features: List[str] = Form(...)
+):
+    print(f"Features------------------------------->  {features}")
+    contents = await file.read()
+    current_userid = userid
+    folder_path = create_submission_folder(submissionId)
+    image_path = os.path.join(folder_path, file.filename)
+
+    with open(image_path, "wb") as buffer:
+        buffer.write(contents)
+    print("Folder created and image saved.")
+
+    image = Image.open(io.BytesIO(contents))
+    extracted_text = image_to_string(image)
+    topics = clean_and_split_text(extracted_text)
+    
+    # ⬇️ Generate summarized name for DB (not for folder)
+    summary = summarize_text(extracted_text)
+    clean_summary = re.sub(r'[^a-zA-Z0-9_\- ]', '', summary).strip()
+    request_name = clean_summary  # store in DB
+
+    explained_topics = []
+    output_dir = folder_path + "/" + submissionId
+    os.makedirs(output_dir, exist_ok=True)
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+
+    response_data = {}
+    
+   
+
+    if "Notes" in features:
+        for topic in topics:
+            explanation = generate_explanation(topic)
+            explained_topics.append((topic, explanation))
+        explanations_text = "\n\n".join([f"{title}\n{'-'*50}\n{content}" for title, content in explained_topics])
+        save_section_to_pdf(os.path.join(output_dir, f"explanations_{timestamp}.pdf"), "Topic Explanations", explanations_text)
+        response_data["explanations"] = explanations_text
+
+    if "Assignments" in features:
+        assignments = generate_assignments(topics)
+        save_section_to_pdf(os.path.join(output_dir, f"assignments_{timestamp}.pdf"), "Assignment Topics", assignments)
+        response_data["assignments"] = assignments
+
+    if "Presentations" in features:
+        presentations = generate_presentations(topics)
+        save_section_to_pdf(os.path.join(output_dir, f"presentations_{timestamp}.pdf"), "Presentation Topics", presentations)
+        response_data["presentations"] = presentations
+
+    if "Quiz" in features:
+        quiz = generate_quiz(extracted_text)
+        save_section_to_pdf(os.path.join(output_dir, f"quizzes_{timestamp}.pdf"), "Quiz", quiz)
+        response_data["quiz"] = quiz
+
+    if "Midterm" in features:
+        papers = generate_mid_papers(extracted_text)
+        save_section_to_pdf(os.path.join(output_dir, f"papers_{timestamp}.pdf"), "Mid Term Papers", papers)
+        response_data["papers"] = papers
+        
+    if "Finalterm" in features:
+        papers = generate_final_papers(extracted_text)
+        save_section_to_pdf(os.path.join(output_dir, f"papers_{timestamp}.pdf"), "Final Term Papers", papers)
+        response_data["papers"] = papers
+
+    if "timeline" in features:
+        timeline = generate_timeline(topics)
+        save_section_to_pdf(os.path.join(output_dir, f"timeline_{timestamp}.pdf"), "Course Timeline", timeline)
+        response_data["timeline"] = timeline
+
+    return {
+        "response": request_name
+    }
