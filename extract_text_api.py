@@ -393,7 +393,7 @@ from datetime import datetime
 import io, os, re, requests, textwrap
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
-from typing import List
+from typing import List, Optional
 
 app = FastAPI()
 current_userid = ""
@@ -433,14 +433,14 @@ def generate_prompt_with_model(prompt):
     return query_mistral(prompt)
 
 # Modular generators
-def generate_assignments(topics):
-    return generate_prompt_with_model(f"Generate assignment topics from this course content: {', '.join(topics)}")
+def generate_assignments(topics,assignmentCount):
+    return generate_prompt_with_model(f"Generate  {assignmentCount} assignment topics from this course content: {', '.join(topics)}")
 
-def generate_presentations(topics):
-    return generate_prompt_with_model(f"Suggest presentation topics for these contents: {', '.join(topics)}")
+def generate_presentations(topics,presentationCount):
+    return generate_prompt_with_model(f"Suggest {presentationCount} presentation topics for these contents: {', '.join(topics)}")
 
-def generate_quiz(text):
-    return generate_prompt_with_model(f"Create 1 quiz from this content \"{text}\" with easy level. Include MCQs, True/False, and Short Questions.")
+def generate_quiz(text,quizDifficulty,mcqsCount,trueFalseCount,shortQCount,LongQCount):
+    return generate_prompt_with_model(f"Create 1 quiz from this content \"{text}\" with {quizDifficulty} level. Include {mcqsCount} MCQ's with four options (a,b,c,d), {trueFalseCount} True/False,{shortQCount} Short Questions and {LongQCount} Long Questions?")
 
 def summarize_text(text: str):
         prompt = f"Summarize the following content in a short phrase (max 10 words): {text[:1000]}"
@@ -483,8 +483,36 @@ async def extract_text(
     file: UploadFile = File(...),
     userid: str = Form(...),
     submissionId: str = Form(...),
-    features: List[str] = Form(...)
-):
+    features: List[str] = Form(...),
+        # Quiz counts
+    mcqsCount: Optional[int] = Form(None),
+    trueFalseCount: Optional[int] = Form(None),
+    shortQCount: Optional[int] = Form(None),
+    longQCount: Optional[int] = Form(None),
+
+    # Midterm counts
+    midMcqsCount: Optional[int] = Form(None),
+    midTrueFalseCount: Optional[int] = Form(None),
+    midShortQCount: Optional[int] = Form(None),
+    midLongQCount: Optional[int] = Form(None),
+    quizDifficulty: Optional[str] = Form(None),
+
+    # Finalterm counts
+    finalMcqsCount: Optional[int] = Form(None),
+    finalTrueFalseCount: Optional[int] = Form(None),
+    finalShortQCount: Optional[int] = Form(None),
+    finalLongQCount: Optional[int] = Form(None),
+
+    # Assignment and Presentation counts
+    assignmentCount: Optional[int] = Form(None),
+    presentationCount: Optional[int] = Form(None),
+    
+):  
+    print(f"📥 Incoming Upload: UserID={userid}, SubmissionID={submissionId}, File={file.filename}, Features={features}, "
+      f"📝 Quiz: MCQs={mcqsCount}, TF={trueFalseCount}, ShortQ={shortQCount}, LongQ={longQCount}, "
+      f"🧪 Mid: MCQs={midMcqsCount}, TF={midTrueFalseCount}, ShortQ={midShortQCount}, LongQ={midLongQCount}, "
+      f"🧾 Final: MCQs={finalMcqsCount}, TF={finalTrueFalseCount}, ShortQ={finalShortQCount}, LongQ={finalLongQCount}, "
+      f"📚 Other: Assignments={assignmentCount}, Presentations={presentationCount}")
     print(f"Features------------------------------->  {features}")
     contents = await file.read()
     current_userid = userid
@@ -505,7 +533,7 @@ async def extract_text(
     request_name = clean_summary  # store in DB
 
     explained_topics = []
-    output_dir = folder_path + "/" + submissionId
+    output_dir = folder_path + "/" 
     os.makedirs(output_dir, exist_ok=True)
     timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
 
@@ -550,7 +578,7 @@ async def extract_text(
         timeline = generate_timeline(topics)
         save_section_to_pdf(os.path.join(output_dir, f"timeline_{timestamp}.pdf"), "Course Timeline", timeline)
         response_data["timeline"] = timeline
-
+    print(request_name)
     return {
         "response": request_name
     }
