@@ -446,11 +446,11 @@ def summarize_text(text: str):
         prompt = f"Summarize the following content in a short phrase (max 10 words): {text[:1000]}"
         return generate_prompt_with_model(prompt)
 
-def generate_mid_papers(text):
-    return generate_prompt_with_model(f"Create Final-Term papers 6 mcqs with options, 4 short and 3 long questions with easy level from this content \"{text}\".")
+def generate_mid_papers(text,midMcqsCount,midTrueFalseCount,midShortQCount,midLongQCount):
+    return generate_prompt_with_model(f"Create a Final-Term paper including {midMcqsCount} mcqs with options, {midTrueFalseCount} true/false, {midShortQCount} short questions and {midLongQCount} long questions  from this content \"{text}\".")
 
-def generate_final_papers(text):
-    return generate_prompt_with_model(f"Create Final-Term papers 14 mcqs with options, 12 True/False, 4 short and 3 long questions with easy level from this content \"{text}\".")
+def generate_final_papers(text,finalMcqsCount,finalTrueFalseCount,finalShortQCount,finalLongQCount):
+    return generate_prompt_with_model(f"Create a Final-Term paper including {finalMcqsCount} mcqs with options, {finalTrueFalseCount} true/false, {finalShortQCount} short questions and {finalLongQCount} long questions  from this content \"{text}\".")
 
 def generate_timeline(topics):
     return generate_prompt_with_model(f"Create a timeline to cover the following topics in a 3-month course: {', '.join(topics)}")
@@ -489,13 +489,13 @@ async def extract_text(
     trueFalseCount: Optional[int] = Form(None),
     shortQCount: Optional[int] = Form(None),
     longQCount: Optional[int] = Form(None),
+    quizDifficulty: Optional[str] = Form(None),
 
     # Midterm counts
     midMcqsCount: Optional[int] = Form(None),
     midTrueFalseCount: Optional[int] = Form(None),
     midShortQCount: Optional[int] = Form(None),
     midLongQCount: Optional[int] = Form(None),
-    quizDifficulty: Optional[str] = Form(None),
 
     # Finalterm counts
     finalMcqsCount: Optional[int] = Form(None),
@@ -515,7 +515,6 @@ async def extract_text(
       f"📚 Other: Assignments={assignmentCount}, Presentations={presentationCount}")
     print(f"Features------------------------------->  {features}")
     contents = await file.read()
-    current_userid = userid
     folder_path = create_submission_folder(submissionId)
     image_path = os.path.join(folder_path, file.filename)
 
@@ -550,27 +549,27 @@ async def extract_text(
         response_data["explanations"] = explanations_text
 
     if "Assignments" in features:
-        assignments = generate_assignments(topics)
+        assignments = generate_assignments(topics,assignmentCount)
         save_section_to_pdf(os.path.join(output_dir, f"assignments_{timestamp}.pdf"), "Assignment Topics", assignments)
         response_data["assignments"] = assignments
 
     if "Presentations" in features:
-        presentations = generate_presentations(topics)
+        presentations = generate_presentations(topics,presentationCount)
         save_section_to_pdf(os.path.join(output_dir, f"presentations_{timestamp}.pdf"), "Presentation Topics", presentations)
         response_data["presentations"] = presentations
 
     if "Quiz" in features:
-        quiz = generate_quiz(extracted_text)
+        quiz = generate_quiz(extracted_text,quizDifficulty,mcqsCount,trueFalseCount,shortQCount,longQCount)
         save_section_to_pdf(os.path.join(output_dir, f"quizzes_{timestamp}.pdf"), "Quiz", quiz)
         response_data["quiz"] = quiz
 
     if "Midterm" in features:
-        papers = generate_mid_papers(extracted_text)
+        papers = generate_mid_papers(extracted_text,midMcqsCount,midTrueFalseCount,midShortQCount,midLongQCount)
         save_section_to_pdf(os.path.join(output_dir, f"papers_{timestamp}.pdf"), "Mid Term Papers", papers)
         response_data["papers"] = papers
         
     if "Finalterm" in features:
-        papers = generate_final_papers(extracted_text)
+        papers = generate_final_papers(extracted_text,finalMcqsCount,finalTrueFalseCount,finalShortQCount,finalLongQCount)
         save_section_to_pdf(os.path.join(output_dir, f"papers_{timestamp}.pdf"), "Final Term Papers", papers)
         response_data["papers"] = papers
 
